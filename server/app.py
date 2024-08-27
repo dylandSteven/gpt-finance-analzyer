@@ -37,10 +37,7 @@ def upload_webs():
             print("=====================")
             response = requests.get(url, timeout=60)
             text = response.content.decode('utf-8')
-            with open('a.txt', 'w', encoding='utf-8') as f:
-                f.write(text)
             body = text.split('<div class="caas-body">')[1]
-            print("1")
             body = body.split('<div id="view-cmts-cta')[0]
             body = re.sub(r'<div\b[^>]*>(.*?)</div>', '', body)
             body = body.replace('</div>', '')
