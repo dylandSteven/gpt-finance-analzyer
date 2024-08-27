@@ -6,7 +6,7 @@ import { useState } from 'react';
 import axios from 'axios';
 
 function App() {
-  const API_SERVER = 'http://localhost:8000';
+  const API_SERVER = 'http://13.59.71.163';
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [rate, setRate] = useState('');
