@@ -33,8 +33,17 @@ def upload_webs():
     if request.method == 'POST':
         data = request.json
         url = data['url']
+        if 'question' in data:
+            question = data['question']
+        else:
+            question = '''
+                Please act as a professional analyst for the American stock market and do the following:
+                Summaries the article and based on the sentiment you understand from the news, how would you rank that news from 1 to 10. (1- is super bad, 10- is excellent)
+                Finally, provide me only rank number value.
+            '''
         try:
             print("=====================")
+            print(question)
             response = requests.get(url, timeout=60)
             text = response.content.decode('utf-8')
             body = text.split('<div class="caas-body">')[1]
@@ -51,9 +60,8 @@ def upload_webs():
                     {
                         "role": "user",
                         "content": f'''
-                            Please act as a professional analyst for the American stock market and do the following:
-                            Summaries the article and based on the sentiment you understand from the news, how would you rank that news from 1 to 10. (1- is super bad, 10- is excellent)
-                            Finally, provide me only rank number value.\n
+                            {question}
+                            \n
                             `{body}`
                         ''',
                     }
