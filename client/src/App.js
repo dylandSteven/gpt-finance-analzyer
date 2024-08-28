@@ -11,7 +11,7 @@ function App() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [rate, setRate] = useState('');
-  const [question, setQuestion] = useState('Please act as a professional analyst for the American stock market and do the following:\nSummaries the article and based on the sentiment you understand from the news, how would you rank that news from 1 to 10. (1- is super bad, 10- is excellent)\nFinally, provide me only rank number value.');
+  const [question, setQuestion] = useState('Please act as a professional analyst for the American stock market and do the following:\n1. Summaries the article\n2. Based on the sentiment you understand from the news, how would you rank that news from 1 to 10. (1- is super bad, 10- is excellent)');
   const [error, setError] = useState('');
 
   return (
@@ -48,6 +48,7 @@ function App() {
               axios.post(`${API_SERVER}/rate`, { url, question })
               .then(response => {
                 if (response.status == 200) {
+                  console.log(response.data.msg, response.data.msg.includes('\n'));
                   setRate(response.data.msg);
                 }
                 setLoading(false);
@@ -63,7 +64,7 @@ function App() {
         </Grid>
         {rate ? (
           <Grid item xs={12} style={{display: 'flex', justifyContent: 'center'}}>
-            <h3 style={{width: '80%', textAlign: 'left'}}>Rate: {rate}</h3>
+            <h3 style={{width: '80%', textAlign: 'left', whiteSpace: 'pre-line'}}>{rate}</h3>
           </Grid>
         ) : ''}
         {error ? (

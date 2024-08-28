@@ -8,7 +8,8 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
+# load_dotenv()
+load_dotenv('/var/www/flaskapp/server/.env')
 GPT_API_KEY = os.getenv('GPT_API_KEY')
 CLIENT_PATH = os.getenv('CLIENT_PATH')
 client = OpenAI(api_key=GPT_API_KEY)
@@ -38,8 +39,9 @@ def upload_webs():
         else:
             question = '''
                 Please act as a professional analyst for the American stock market and do the following:
-                Summaries the article and based on the sentiment you understand from the news, how would you rank that news from 1 to 10. (1- is super bad, 10- is excellent)
-                Finally, provide me only rank number value.
+                1. Summaries the article
+                2. Based on the sentiment you understand from the news, how would you rank that news from 1 to 10. (1- is super bad, 10- is excellent)
+                Pleae provie formatted response with line break, not in single line.
             '''
         try:
             print("=====================")
@@ -57,14 +59,8 @@ def upload_webs():
             # return make_response(jsonify({'msg': '6'}), 200)
             chat = client.chat.completions.create(
                 messages=[
-                    {
-                        "role": "user",
-                        "content": f'''
-                            {question}
-                            \n
-                            `{body}`
-                        ''',
-                    }
+                    {"role": "system", "content": question},
+                    {"role": "user", "content": body}
                 ],
                 model="gpt-3.5-turbo",
             )
