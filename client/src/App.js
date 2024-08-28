@@ -4,6 +4,7 @@ import Button from '@mui/material/Button';
 import { Grid } from '@mui/material';
 import { useState } from 'react';
 import axios from 'axios';
+import parse from 'html-react-parser';
 
 function App() {
   const API_SERVER = 'http://13.59.71.163';
@@ -64,7 +65,8 @@ function App() {
         </Grid>
         {rate ? (
           <Grid item xs={12} style={{display: 'flex', justifyContent: 'center'}}>
-            <h3 style={{width: '80%', textAlign: 'left', whiteSpace: 'pre-line'}}>{rate}</h3>
+            {/* <h3 style={{width: '80%', textAlign: 'left', whiteSpace: 'pre-line'}}>{rate}</h3> */}
+            <div style={{width: '80%'}}>{parse(rate)}</div>
           </Grid>
         ) : ''}
         {error ? (

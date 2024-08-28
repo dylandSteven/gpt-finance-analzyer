@@ -41,10 +41,10 @@ def upload_webs():
                 Please act as a professional analyst for the American stock market and do the following:
                 1. Summaries the article
                 2. Based on the sentiment you understand from the news, how would you rank that news from 1 to 10. (1- is super bad, 10- is excellent)
-                Pleae provie formatted response with line break, not in single line.
             '''
         try:
             print("=====================")
+            question = f'(Send me an HTML response inside a div using text-align. The text should be formatted as RTL or LTR based on the language type.)\n{question}'
             print(question)
             response = requests.get(url, timeout=60)
             text = response.content.decode('utf-8')
