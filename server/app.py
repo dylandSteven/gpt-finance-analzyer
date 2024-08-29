@@ -44,7 +44,7 @@ def upload_webs():
             '''
         try:
             print("=====================")
-            question = f'(*.Required an HTML response inside a div. Based on language type, RTL text should be right aligned and LTR text should be left aligned in a div.)\n{question}'
+            question = f'(*.Required an HTML response inside a div. Based on language type, all RTL texts should be right aligned and all LTR texts should be left aligned.)\n{question}'
             print(question)
             response = requests.get(url, timeout=60)
             text = response.content.decode('utf-8')
