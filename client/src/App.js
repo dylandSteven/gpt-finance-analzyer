@@ -65,8 +65,7 @@ function App() {
         </Grid>
         {rate ? (
           <Grid item xs={12} style={{display: 'flex', justifyContent: 'center'}}>
-            {/* <h3 style={{width: '80%', textAlign: 'left', whiteSpace: 'pre-line'}}>{rate}</h3> */}
-            <div style={{width: '80%'}}>{parse(rate)}</div>
+            <div style={{width: '80%', textAlign: 'justify'}}>{parse(rate)}</div>
           </Grid>
         ) : ''}
         {error ? (
