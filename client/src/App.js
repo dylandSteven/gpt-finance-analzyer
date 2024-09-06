@@ -7,7 +7,8 @@ import axios from 'axios';
 import parse from 'html-react-parser';
 
 function App() {
-  const API_SERVER = 'http://13.59.71.163';
+  const API_SERVER = 'http://3.83.90.149';
+  // const API_SERVER = 'http://13.59.71.163';
   // const API_SERVER = 'http://localhost:8000';
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
