@@ -36,3 +36,14 @@
     transform: rotate(360deg);
   }
 }
+
+.tooltip {
+  display: none;
+  position: absolute;
+  background-color: white;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  pointer-events: none;
+  font-size: 12px;
+}

@@ -3,3 +3,4 @@ openai
 Flask-Cors
 beautifulsoup4
 python-dotenv
+requests

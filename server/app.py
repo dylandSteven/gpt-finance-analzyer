@@ -1,18 +1,13 @@
 from flask import Flask, request, make_response, jsonify, send_from_directory
-import requests
-import re
-import json
-from bs4 import BeautifulSoup
-from openai import OpenAI
 from flask_cors import CORS
 from dotenv import load_dotenv
+import pandas as pd
 import os
 
 # load_dotenv()
 load_dotenv('/var/www/flaskapp/server/.env')
 GPT_API_KEY = os.getenv('GPT_API_KEY')
 CLIENT_PATH = os.getenv('CLIENT_PATH')
-client = OpenAI(api_key=GPT_API_KEY)
 
 app = Flask(__name__, static_folder=CLIENT_PATH, static_url_path='/')
 CORS(app)
@@ -29,50 +24,49 @@ def catch_all(path):
 def hello():
     return make_response(jsonify({'msg': 'Hello World!'}), 200)
 
-@app.route('/rate', methods=['POST'])
-def upload_webs():
-    if request.method == 'POST':
-        data = request.json
-        url = data['url']
-        if 'question' in data:
-            question = data['question']
-        else:
-            question = '''
-                Please act as a professional analyst for the American stock market and do the following:
-                1. Summaries the article
-                2. Based on the sentiment you understand from the news, how would you rank that news from 1 to 10. (1- is super bad, 10- is excellent)
-            '''
-        try:
-            print("=====================")
-            question = f'(*.Required an HTML response inside a div. Based on language type, all RTL texts should be right aligned and all LTR texts should be left aligned.)\n{question}'
-            print(question)
-            response = requests.get(url, timeout=60)
-            text = response.content.decode('utf-8')
-            body = text.split('<div class="caas-body">')[1]
-            body = body.split('<div id="view-cmts-cta')[0]
-            body = re.sub(r'<div\b[^>]*>(.*?)</div>', '', body)
-            body = body.replace('</div>', '')
-            soup = BeautifulSoup(body, 'html.parser')
-            body = soup.get_text()
-            print(body)
-            print("=====================")
-            # return make_response(jsonify({'msg': '6'}), 200)
-            chat = client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": question},
-                    {"role": "user", "content": body}
-                ],
-                model="gpt-3.5-turbo",
-            )
-            chat = chat.model_dump_json()
-            chat = json.loads(chat)
-            print(chat)
-            return make_response(jsonify({'msg': chat['choices'][0]['message']['content']}), 200)
-        except Exception as e:
-            print(str(e))
-            return make_response(jsonify({'msg': str(e)}), 400)
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return make_response(jsonify({'error': 'No file part in the request'}), 400)
+    
+    file = request.files['file']
+    
+    if file.filename == '':
+        return make_response(jsonify({'error': 'No file selected for uploading'}), 400)
+    
+    try:
+        df = pd.read_csv(file)
 
-    return make_response(jsonify({'msg': 'Done'}), 200)
+        if 'Zestimate' not in df.columns: df['Zestimate'] = ''
+        df['Zestimate'] = df['Zestimate'].astype('str')
+        if 'Neighborhood' not in df.columns: df['Neighborhood'] = ''
+        df['Neighborhood'] = df['Neighborhood'].astype('str')
+        if 'lat' not in df.columns: df['lat'] = ''
+        df['lat'] = df['lat'].astype('str')
+        if 'lng' not in df.columns: df['lng'] = ''
+        df['lng'] = df['lng'].astype('str')
+
+        map_data = []
+
+        addresses = df['Property Location'].tolist()
+        for index, address in enumerate(addresses):
+            zestimate = '' if (df.at[index, 'Zestimate'] == '' or df.at[index, 'Zestimate'] == 'nan' or df.at[index, 'Zestimate'] == 'none') else df.at[index, 'Zestimate']
+            neighborhood = '' if (df.at[index, 'Neighborhood'] == '' or df.at[index, 'Neighborhood'] == 'nan' or df.at[index, 'Neighborhood'] == 'none') else df.at[index, 'Neighborhood']
+            map_data.append({
+                'type': 'Feature',
+                'geometry': {
+                    'type': 'Point',
+                    'coordinates': [float(df.at[index, 'lng']), float(df.at[index, 'lat'])]
+                },
+                'properties': {
+                    'title': 'Point 2',
+                    'description': f'<strong>Description</strong><br/><span>Zestimate: {zestimate}</span><br/><span>Neighborhood: {neighborhood}</span>'
+                }
+            })
+
+        return make_response(jsonify({'features': map_data}), 200)
+    except Exception as e:
+        return make_response(jsonify({'error': 'Unable to proceed this file'}), 400)
 
 if __name__== '__main__':
     app.run(debug=True, host='0.0.0.0', port=8000)
