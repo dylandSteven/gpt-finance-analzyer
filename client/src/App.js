@@ -146,7 +146,7 @@ function App() {
     formData.append('file', event.target.files[0]);
 
     try {
-      const response = await axios.post('http://localhost:8000/upload', formData, {
+      const response = await axios.post('http://18.234.164.138/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
