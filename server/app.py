@@ -3,14 +3,22 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 import pandas as pd
 import os
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
-# load_dotenv()
-load_dotenv('/var/www/flaskapp/server/.env')
-GPT_API_KEY = os.getenv('GPT_API_KEY')
+if os.getlogin() == 'mon':
+    load_dotenv()
+else:
+    load_dotenv('/var/www/mapview/server/.env')
 CLIENT_PATH = os.getenv('CLIENT_PATH')
+CREDENTIALS = os.getenv('CREDENTIALS')
 
 app = Flask(__name__, static_folder=CLIENT_PATH, static_url_path='/')
 CORS(app)
+
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS, scope)
+client = gspread.authorize(creds)
 
 @app.route('/')
 def serve():
@@ -23,6 +31,45 @@ def catch_all(path):
 @app.route('/test')
 def hello():
     return make_response(jsonify({'msg': 'Hello World!'}), 200)
+
+@app.route('/sheet', methods=['GET'])
+def get_sheet():
+    map_data = []
+
+    try:
+        sheet = client.open('mapdata').sheet1
+        data = sheet.get_all_values()
+
+        df = pd.DataFrame(data[1:], columns=data[0])
+        if 'Zestimate' not in df.columns: df['Zestimate'] = ''
+        df['Zestimate'] = df['Zestimate'].astype('str')
+        if 'Neighborhood' not in df.columns: df['Neighborhood'] = ''
+        df['Neighborhood'] = df['Neighborhood'].astype('str')
+        if 'lat' not in df.columns: df['lat'] = ''
+        df['lat'] = df['lat'].astype('str')
+        if 'lng' not in df.columns: df['lng'] = ''
+        df['lng'] = df['lng'].astype('str')
+
+        addresses = df['Property Location'].tolist()
+        for index, address in enumerate(addresses):
+            zestimate = '' if (df.at[index, 'Zestimate'] == '' or df.at[index, 'Zestimate'] == 'nan' or df.at[index, 'Zestimate'] == 'none') else df.at[index, 'Zestimate']
+            neighborhood = '' if (df.at[index, 'Neighborhood'] == '' or df.at[index, 'Neighborhood'] == 'nan' or df.at[index, 'Neighborhood'] == 'none') else df.at[index, 'Neighborhood']
+            map_data.append({
+                'type': 'Feature',
+                'geometry': {
+                    'type': 'Point',
+                    'coordinates': [float(df.at[index, 'lng']), float(df.at[index, 'lat'])]
+                },
+                'properties': {
+                    'title': 'Description',
+                    'zestimate': zestimate,
+                    'neighborhood': neighborhood
+                }
+            })
+    except Exception as e:
+        print(f'Error in sheet api: {str(e)}')
+
+    return make_response(jsonify({'features': map_data}), 200)
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -59,8 +106,9 @@ def upload_file():
                     'coordinates': [float(df.at[index, 'lng']), float(df.at[index, 'lat'])]
                 },
                 'properties': {
-                    'title': 'Point 2',
-                    'description': f'<strong>Description</strong><br/><span>Zestimate: {zestimate}</span><br/><span>Neighborhood: {neighborhood}</span>'
+                    'title': 'Description',
+                    'zestimate': zestimate,
+                    'neighborhood': neighborhood
                 }
             })
 

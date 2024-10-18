@@ -10,11 +10,16 @@ import { neighborhoods } from './data';
 mapboxgl.accessToken = 'pk.eyJ1IjoiZHlsYW5kc2FsZGFuYSIsImEiOiJjbTI0dXhobnMwNGdoMnFxM2VwZzM5bzAxIn0.2PL3TnBGqeXWDN5XVlL-BA';
 
 function App() {
+  const serverUrl = 'http://18.234.164.138';
+  // const serverUrl = 'http://localhost:8000';
+
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const fileInputRef = useRef(null);
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [filter, setFilter] = useState('');
+  const [tmpFilter, setTmpFilter] = useState('');
 
   useEffect(() => {
     // Initialize map
@@ -74,9 +79,16 @@ function App() {
       });
       ////////// Draw Neighborhood Areas //////////
 
-      mapRef.current.loadImage('pin.png', (error, image) => {
+      mapRef.current.loadImage('pin.png', async (error, image) => {
         if (error) throw error;
         mapRef.current.addImage('custom-pin', image);
+
+        await handleGoogleSheet();
+        setTimeout(() => {
+          setInterval(() => {
+            handleGoogleSheet();
+          }, 10000);
+        }, 10000);
 
         mapRef.current.addSource('points', {
           'type': 'geojson',
@@ -104,19 +116,22 @@ function App() {
           closeOnClick: false
         });
   
-        // Show popup on mouseenter
-        mapRef.current.on('mouseenter', 'points-layer', (e) => {
-          // Change the cursor to pointer
+        mapRef.current.on('mouseenter', 'points-layer', () => {
           mapRef.current.getCanvas().style.cursor = 'pointer';
-  
-          // Get the coordinates and properties of the feature
+        });
+
+        mapRef.current.on('click', 'points-layer', (e) => {
           const coordinates = e.features[0].geometry.coordinates.slice();
-          const description = e.features[0].properties.description;
-  
-          // Set popup content and coordinates
+          const details = e.features[0].properties;
           popup
             .setLngLat(coordinates)
-            .setHTML(description)
+            .setHTML(`
+              <strong>${details.title}</strong>
+              <br/>
+              <span>Zestimate: ${details.zestimate}</span>
+              <br/>
+              <span>Neighborhood: ${details.neighborhood}</span>
+            `)
             .addTo(mapRef.current);
         });
   
@@ -132,12 +147,20 @@ function App() {
 
   useEffect(() => {
     if (mapRef.current && mapRef.current.getSource('points')) {
+      const filterData = [];
+      const filterKey = filter.toLowerCase();
+      data.forEach(item => {
+        const text = item.properties.zestimate.toLowerCase() + item.properties.neighborhood.toLowerCase();
+        if (text.includes(filterKey)) {
+          filterData.push(item);
+        }
+      });
       mapRef.current.getSource('points').setData({
         'type': 'FeatureCollection',
-        'features': data
+        'features': filterData
       });
     }
-  }, [data]);
+  }, [data, filter]);
 
   const handleFileChange = async (event) => {
     setLoading(true);
@@ -146,33 +169,67 @@ function App() {
     formData.append('file', event.target.files[0]);
 
     try {
-      const response = await axios.post('http://18.234.164.138/upload', formData, {
+      const response = await axios.post(`${serverUrl}/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
       setLoading(false);
       console.log(response);
-      if (response.data.features) setData(response.data.features);
+      if (response.data.features) {
+        setData(response.data.features);
+      }
     } catch (error) {
       setLoading(false);
       console.error('Error uploading file: ', error);
     }
   };
 
+
+  const handleGoogleSheet = async () => {
+    setLoading(true);
+
+    try {
+      const response = await axios.get(`${serverUrl}/sheet`);
+      setLoading(false);
+      console.log(response);
+      if (response.data.features) {
+        setData(response.data.features);
+      }
+    } catch (error) {
+      setLoading(false);
+      console.error('Error uploading file: ', error);
+    }
+  };
+
+  const handleFilter = () => {
+    setFilter(tmpFilter);
+  }
+
   return (
     <div>
       <div style={{display: 'flex', height: '120px', padding: '0px 40px', alignItems: 'center'}}>
         <input type='file' ref={fileInputRef} onChange={handleFileChange} style={{display: 'none'}} />
-        <Button
+        {/* <Button
           type='submit'
           variant='outlined'
           onClick={() => { fileInputRef.current.click(); }}
           disabled={loading}
           style={{height: '48px'}}
         >{loading ? 'Loading' : 'Upload'}</Button>
-        <TextField placeholder='Filter' style={{marginLeft: '56px'}} />
-        <Button variant='outlined' style={{height: '48px', marginLeft: '12px'}}>Filter</Button>
+        <Button
+          type='submit'
+          variant='outlined'
+          onClick={() => { handleGoogleSheet(); }}
+          disabled={loading}
+          style={{height: '48px', marginLeft: '36px'}}
+        >{loading ? 'Loading' : 'Connect Google Sheet'}</Button> */}
+        <TextField placeholder='Filter' value={tmpFilter} onChange={(e) => { setTmpFilter(e.target.value); }} />
+        <Button
+          variant='outlined'
+          style={{height: '48px', marginLeft: '12px'}}
+          onClick={() => { handleFilter(); }}
+        >Filter</Button>
       </div>
       <div ref={mapContainerRef} style={{ width: '100%', height: 'calc(100vh - 120px)' }} />
     </div>

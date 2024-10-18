@@ -1,2 +1,4 @@
 .env
 flaskapp.wsgi
+credentials.json
+dyland-credentials.json
