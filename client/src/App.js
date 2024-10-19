@@ -1,7 +1,5 @@
 import './App.css';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
-import { Grid } from '@mui/material';
+import { Checkbox, Button, FormControlLabel } from '@mui/material';
 import { useState, useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import axios from 'axios';
@@ -15,11 +13,10 @@ function App() {
 
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
-  const fileInputRef = useRef(null);
   const [data, setData] = useState([]);
+  const [columns, setColumns] = useState([]);
+  const columnsRef = useRef(columns);
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState('');
-  const [tmpFilter, setTmpFilter] = useState('');
 
   useEffect(() => {
     // Initialize map
@@ -61,21 +58,6 @@ function App() {
             'line-width': 1
           }
         });
-
-        // mapRef.current.on('mouseleave', `polygon${i}`, (e) => {
-        //   mapRef.current.setPaintProperty(`polygon${i}`, 'fill-opacity', 0.8);
-        //   mapRef.current.getCanvas().style.cursor = '';
-        // });
-
-        // mapRef.current.on('mouseenter', `polygon${i}`, (e) => {
-        //   mapRef.current.setPaintProperty(`polygon${i}`, 'fill-opacity', 0);
-        //   setTimeout(() => {
-        //     mapRef.current.getCanvas().style.cursor = 'pointer';
-        //   }, 50);
-        // });
-
-        // mapRef.current.on('mousemove', `polygon${i}`, (e) => {
-        // });
       });
       ////////// Draw Neighborhood Areas //////////
 
@@ -83,7 +65,7 @@ function App() {
         if (error) throw error;
         mapRef.current.addImage('custom-pin', image);
 
-        await handleGoogleSheet();
+        await handleGoogleSheet(true);
         setTimeout(() => {
           setInterval(() => {
             handleGoogleSheet();
@@ -98,7 +80,6 @@ function App() {
           }
         });
   
-        // Add a circle layer to display the points
         mapRef.current.addLayer({
           'id': 'points-layer',
           'type': 'symbol',
@@ -110,7 +91,6 @@ function App() {
           }
         });
   
-        // Create a popup but don’t add it to the map yet
         const popup = new mapboxgl.Popup({
           closeButton: false,
           closeOnClick: false
@@ -123,15 +103,17 @@ function App() {
         mapRef.current.on('click', 'points-layer', (e) => {
           const coordinates = e.features[0].geometry.coordinates.slice();
           const details = e.features[0].properties;
+          let innerHtml = '<strong>Description</strong>';
+          const visibleColumns = columnsRef.current.filter(obj => obj.isChecked);
+          console.log(visibleColumns);
+          Object.keys(details).forEach(property => {
+            if (visibleColumns.find(obj => obj.name == property)) {
+              innerHtml += `<br/><span>${property}: ${details[property]}</span>`
+            }
+          });
           popup
             .setLngLat(coordinates)
-            .setHTML(`
-              <strong>${details.title}</strong>
-              <br/>
-              <span>Zestimate: ${details.zestimate}</span>
-              <br/>
-              <span>Neighborhood: ${details.neighborhood}</span>
-            `)
+            .setHTML(innerHtml)
             .addTo(mapRef.current);
         });
   
@@ -147,46 +129,39 @@ function App() {
 
   useEffect(() => {
     if (mapRef.current && mapRef.current.getSource('points')) {
-      const filterData = [];
-      const filterKey = filter.toLowerCase();
-      data.forEach(item => {
-        const text = item.properties.zestimate.toLowerCase() + item.properties.neighborhood.toLowerCase();
-        if (text.includes(filterKey)) {
-          filterData.push(item);
-        }
-      });
       mapRef.current.getSource('points').setData({
         'type': 'FeatureCollection',
-        'features': filterData
+        'features': data
       });
     }
-  }, [data, filter]);
+  }, [data]);
 
-  const handleFileChange = async (event) => {
-    setLoading(true);
+  useEffect(() => {
+    columnsRef.current = columns;
+  }, [columns]);
 
-    const formData = new FormData();
-    formData.append('file', event.target.files[0]);
+  const showColumns = () => {
+    return columns.map(column => (
+      <FormControlLabel
+        style={{display: 'block'}}
+        label={column.name}
+        control={
+          <Checkbox
+            checked={column.isChecked}
+            onChange={(e) => {
+              const updatedColumns = [...columns];
+              const itemToUpdate = updatedColumns.find(obj => obj.name === e.target.value);
+              itemToUpdate.isChecked = !itemToUpdate.isChecked;
+              setColumns(updatedColumns);
+            }}
+            value={column.name}
+          />
+        }
+      />
+    ));
+  }
 
-    try {
-      const response = await axios.post(`${serverUrl}/upload`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      setLoading(false);
-      console.log(response);
-      if (response.data.features) {
-        setData(response.data.features);
-      }
-    } catch (error) {
-      setLoading(false);
-      console.error('Error uploading file: ', error);
-    }
-  };
-
-
-  const handleGoogleSheet = async () => {
+  const handleGoogleSheet = async (isColumnUpdate=false) => {
     setLoading(true);
 
     try {
@@ -195,6 +170,13 @@ function App() {
       console.log(response);
       if (response.data.features) {
         setData(response.data.features);
+        if (response.data.features.length > 0 && columns.length == 0 && isColumnUpdate) {
+          const newColumns = [];
+          Object.keys(response.data.features[0].properties).forEach(property => {
+            newColumns.push({ name: property, isChecked: false });
+          });
+          setColumns(newColumns);
+        }
       }
     } catch (error) {
       setLoading(false);
@@ -202,36 +184,13 @@ function App() {
     }
   };
 
-  const handleFilter = () => {
-    setFilter(tmpFilter);
-  }
-
   return (
-    <div>
-      <div style={{display: 'flex', height: '120px', padding: '0px 40px', alignItems: 'center'}}>
-        <input type='file' ref={fileInputRef} onChange={handleFileChange} style={{display: 'none'}} />
-        {/* <Button
-          type='submit'
-          variant='outlined'
-          onClick={() => { fileInputRef.current.click(); }}
-          disabled={loading}
-          style={{height: '48px'}}
-        >{loading ? 'Loading' : 'Upload'}</Button>
-        <Button
-          type='submit'
-          variant='outlined'
-          onClick={() => { handleGoogleSheet(); }}
-          disabled={loading}
-          style={{height: '48px', marginLeft: '36px'}}
-        >{loading ? 'Loading' : 'Connect Google Sheet'}</Button> */}
-        <TextField placeholder='Filter' value={tmpFilter} onChange={(e) => { setTmpFilter(e.target.value); }} />
-        <Button
-          variant='outlined'
-          style={{height: '48px', marginLeft: '12px'}}
-          onClick={() => { handleFilter(); }}
-        >Filter</Button>
+    <div style={{display: 'flex'}}>
+      <div ref={mapContainerRef} style={{ width: 'calc(100% - 360px)', height: '100vh' }} />
+      <div style={{width: '360px', paddingLeft: '16px', height: '100vh', overflowY: 'scroll'}}>
+        <h2>Show Values</h2>
+        {showColumns()}
       </div>
-      <div ref={mapContainerRef} style={{ width: '100%', height: 'calc(100vh - 120px)' }} />
     </div>
   );
 }

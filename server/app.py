@@ -5,13 +5,18 @@ import pandas as pd
 import os
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+from googleapiclient.discovery import build
 
-if os.getlogin() == 'mon':
-    load_dotenv()
-else:
+try:
+    if os.getlogin() == 'mon':
+        load_dotenv()
+    else:
+        load_dotenv('/var/www/mapview/server/.env')
+except:
     load_dotenv('/var/www/mapview/server/.env')
 CLIENT_PATH = os.getenv('CLIENT_PATH')
 CREDENTIALS = os.getenv('CREDENTIALS')
+SPREADSHEET_ID = os.getenv('SPREADSHEET_ID')
 
 app = Flask(__name__, static_folder=CLIENT_PATH, static_url_path='/')
 CORS(app)
@@ -19,6 +24,8 @@ CORS(app)
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS, scope)
 client = gspread.authorize(creds)
+service = build('sheets', 'v4', credentials=creds)
+spreadsheet_id = SPREADSHEET_ID
 
 @app.route('/')
 def serve():
@@ -50,21 +57,23 @@ def get_sheet():
         if 'lng' not in df.columns: df['lng'] = ''
         df['lng'] = df['lng'].astype('str')
 
-        addresses = df['Property Location'].tolist()
-        for index, address in enumerate(addresses):
-            zestimate = '' if (df.at[index, 'Zestimate'] == '' or df.at[index, 'Zestimate'] == 'nan' or df.at[index, 'Zestimate'] == 'none') else df.at[index, 'Zestimate']
-            neighborhood = '' if (df.at[index, 'Neighborhood'] == '' or df.at[index, 'Neighborhood'] == 'nan' or df.at[index, 'Neighborhood'] == 'none') else df.at[index, 'Neighborhood']
+        try:
+            spreadsheet = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+            criteria = spreadsheet['sheets'][0]['basicFilter']['criteria']
+            for key in criteria.keys():
+                if 'hiddenValues' in criteria[key]:
+                    df = df[~df[data[0][int(key)]].isin(criteria[key]['hiddenValues'])]
+        except Exception as err:
+            print(f'Filtering error: {str(err)}')
+
+        for index, row in df.iterrows():
             map_data.append({
                 'type': 'Feature',
                 'geometry': {
                     'type': 'Point',
-                    'coordinates': [float(df.at[index, 'lng']), float(df.at[index, 'lat'])]
+                    'coordinates': [float(row['lng']), float(row['lat'])]
                 },
-                'properties': {
-                    'title': 'Description',
-                    'zestimate': zestimate,
-                    'neighborhood': neighborhood
-                }
+                'properties': row.to_dict()
             })
     except Exception as e:
         print(f'Error in sheet api: {str(e)}')
