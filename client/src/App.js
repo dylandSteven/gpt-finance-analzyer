@@ -16,6 +16,7 @@ function App() {
   const mapRef = useRef(null);
   const [data, setData] = useState({'0': [], '1': []});
   const [columns, setColumns] = useState([]);
+  const [isNeighborhoods, setIsNeighborhoods] = useState(true);
   const columnsRef = useRef(columns);
   const [loading, setLoading] = useState(false);
 
@@ -120,11 +121,11 @@ function App() {
       });
 
       await handleGoogleSheet(true);
-      setTimeout(() => {
-        setInterval(() => {
-          handleGoogleSheet();
-        }, 10000);
-      }, INTERVAL_SECONDS);
+      // setTimeout(() => {
+      //   setInterval(() => {
+      //     handleGoogleSheet();
+      //   }, 10000);
+      // }, INTERVAL_SECONDS);
     });
 
     return () => mapRef.current.remove();
@@ -198,6 +199,23 @@ function App() {
     <div style={{display: 'flex'}}>
       <div ref={mapContainerRef} style={{ width: 'calc(100% - 360px)', height: '100vh' }} />
       <div style={{width: '360px', paddingLeft: '16px', height: '100vh', overflowY: 'scroll'}}>
+        <FormControlLabel
+          style={{display: 'block'}}
+          label='Show Neighborhoods'
+          control={
+            <Checkbox
+              checked={isNeighborhoods}
+              onChange={(e) => {
+                neighborhoods.forEach((neighborhood, i) => {
+                  mapRef.current.setLayoutProperty(`polygon${i}`, 'visibility', !isNeighborhoods? 'visible' : 'none');
+                });
+                setIsNeighborhoods(!isNeighborhoods);
+              }}
+            />
+          }
+        />
+        <h2>Inspection: {data[Object.keys(data)[0]].length}</h2>
+        <h2>Sold Properties: {data[Object.keys(data)[1]].length}</h2>
         <h2>Show Values</h2>
         {showColumns()}
       </div>

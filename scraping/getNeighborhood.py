@@ -13,8 +13,11 @@ def getNeighborhood(point):
     for item in data:
         polygon = Polygon(item['geometry']['coordinates'][0])
         if polygon.contains(point):
-            return item['properties']['location']
-    return ''
+            neighborhood = item['properties']['location']
+            neighborhood = neighborhood.replace('Memphis, TN (', '').replace(')', '')
+            crimelevel = item['properties']['crimelevel']
+            return {'neighborhood': neighborhood, 'crimelevel': crimelevel}
+    return {'neighborhood': '', 'crimelevel': -1}
 
 def main():
     df = pd.read_csv(CSV_FILE_PATH)
@@ -25,7 +28,9 @@ def main():
     for index, address in enumerate(addresses):
         print(index, address)
         point = Point([float(df.at[index, 'lng']), float(df.at[index, 'lat'])])
-        df.at[index, 'Neighborhood'] = getNeighborhood(point)
+        data = getNeighborhood(point)
+        df.at[index, 'Neighborhood'] = data['neighborhood']
+        if data['crimelevel'] > -1: df.at[index, 'Neighborhood crime score'] = data['crimelevel'] 
         df.to_csv(CSV_FILE_PATH, index=False)
 
 main()
