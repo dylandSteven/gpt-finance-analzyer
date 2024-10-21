@@ -10,10 +10,11 @@ mapboxgl.accessToken = 'pk.eyJ1IjoiZHlsYW5kc2FsZGFuYSIsImEiOiJjbTI0dXhobnMwNGdoM
 function App() {
   const serverUrl = 'http://18.234.164.138';
   // const serverUrl = 'http://localhost:8000';
+  const INTERVAL_SECONDS = 30000;
 
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
-  const [data, setData] = useState([]);
+  const [data, setData] = useState({'0': [], '1': []});
   const [columns, setColumns] = useState([]);
   const columnsRef = useRef(columns);
   const [loading, setLoading] = useState(false);
@@ -28,7 +29,7 @@ function App() {
     });
 
     // Add points as GeoJSON source
-    mapRef.current.on('load', () => {
+    mapRef.current.on('load', async () => {
       ////////// Draw Neighborhood Areas //////////
       neighborhoods.forEach((neighborhood, i) => {
         mapRef.current.addSource(`polygon${i}`, {
@@ -59,79 +60,85 @@ function App() {
           }
         });
       });
-      ////////// Draw Neighborhood Areas //////////
 
-      mapRef.current.loadImage('pin.png', async (error, image) => {
-        if (error) throw error;
-        mapRef.current.addImage('custom-pin', image);
+      Object.keys(data).forEach((sheet_id, index) => {
+        ////////// Draw Neighborhood Areas //////////
+        mapRef.current.loadImage(`pin${index}.png`, async (error, image) => {
+          if (error) throw error;
+          mapRef.current.addImage(`pin${index}`, image);
 
-        await handleGoogleSheet(true);
-        setTimeout(() => {
-          setInterval(() => {
-            handleGoogleSheet();
-          }, 10000);
-        }, 10000);
-
-        mapRef.current.addSource('points', {
-          'type': 'geojson',
-          'data': {
-            'type': 'FeatureCollection',
-            'features': data
-          }
-        });
-  
-        mapRef.current.addLayer({
-          'id': 'points-layer',
-          'type': 'symbol',
-          'source': 'points',
-          'layout': {
-            'icon-image': 'custom-pin',
-            'icon-size': 0.015,
-            'icon-allow-overlap': true
-          }
-        });
-  
-        const popup = new mapboxgl.Popup({
-          closeButton: false,
-          closeOnClick: false
-        });
-  
-        mapRef.current.on('mouseenter', 'points-layer', () => {
-          mapRef.current.getCanvas().style.cursor = 'pointer';
-        });
-
-        mapRef.current.on('click', 'points-layer', (e) => {
-          const coordinates = e.features[0].geometry.coordinates.slice();
-          const details = e.features[0].properties;
-          let innerHtml = '<strong>Description</strong>';
-          const visibleColumns = columnsRef.current.filter(obj => obj.isChecked);
-          console.log(visibleColumns);
-          Object.keys(details).forEach(property => {
-            if (visibleColumns.find(obj => obj.name == property)) {
-              innerHtml += `<br/><span>${property}: ${details[property]}</span>`
+          mapRef.current.addSource(`points${index}`, {
+            'type': 'geojson',
+            'data': {
+              'type': 'FeatureCollection',
+              'features': data[sheet_id]
             }
           });
-          popup
-            .setLngLat(coordinates)
-            .setHTML(innerHtml)
-            .addTo(mapRef.current);
-        });
-  
-        mapRef.current.on('mouseleave', 'points-layer', () => {
-          mapRef.current.getCanvas().style.cursor = '';
-          popup.remove();
+    
+          mapRef.current.addLayer({
+            'id': `points-layer${index}`,
+            'type': 'symbol',
+            'source': `points${index}`,
+            'layout': {
+              'icon-image': `pin${index}`,
+              'icon-size': 0.05,
+              'icon-allow-overlap': true
+            }
+          });
+    
+          const popup = new mapboxgl.Popup({
+            closeButton: false,
+            closeOnClick: false
+          });
+    
+          mapRef.current.on('mouseenter', `points-layer${index}`, () => {
+            mapRef.current.getCanvas().style.cursor = 'pointer';
+          });
+
+          mapRef.current.on('click', `points-layer${index}`, (e) => {
+            const coordinates = e.features[0].geometry.coordinates.slice();
+            const details = e.features[0].properties;
+            let innerHtml = '<strong>Description</strong>';
+            const visibleColumns = columnsRef.current.filter(obj => obj.isChecked);
+            console.log(visibleColumns);
+            Object.keys(details).forEach(property => {
+              if (visibleColumns.find(obj => obj.name == property)) {
+                innerHtml += `<br/><span>${property}: ${details[property]}</span>`
+              }
+            });
+            popup
+              .setLngLat(coordinates)
+              .setHTML(innerHtml)
+              .addTo(mapRef.current);
+          });
+    
+          mapRef.current.on('mouseleave', `points-layer${index}`, () => {
+            mapRef.current.getCanvas().style.cursor = '';
+            popup.remove();
+          });
         });
       });
+
+      await handleGoogleSheet(true);
+      setTimeout(() => {
+        setInterval(() => {
+          handleGoogleSheet();
+        }, 10000);
+      }, INTERVAL_SECONDS);
     });
 
     return () => mapRef.current.remove();
   }, []);
 
   useEffect(() => {
-    if (mapRef.current && mapRef.current.getSource('points')) {
-      mapRef.current.getSource('points').setData({
-        'type': 'FeatureCollection',
-        'features': data
+    if (mapRef.current) {
+      Object.keys(data).forEach((sheet_id, index) => {
+        if (mapRef.current.getSource(`points${index}`)) {
+          mapRef.current.getSource(`points${index}`).setData({
+            'type': 'FeatureCollection',
+            'features': data[sheet_id]
+          });
+        }
       });
     }
   }, [data]);
@@ -170,17 +177,20 @@ function App() {
       console.log(response);
       if (response.data.features) {
         setData(response.data.features);
-        if (response.data.features.length > 0 && columns.length == 0 && isColumnUpdate) {
+        if (Object.keys(response.data.features).length > 0 && columns.length == 0 && isColumnUpdate) {
           const newColumns = [];
-          Object.keys(response.data.features[0].properties).forEach(property => {
-            newColumns.push({ name: property, isChecked: false });
+          Object.keys(response.data.features).forEach(sheet_id => {
+            Object.keys(response.data.features[sheet_id][0].properties).forEach(property => {
+              const existingColumn = newColumns.find(obj => obj.name === property);
+              if (!existingColumn) newColumns.push({ name: property, isChecked: false });
+            });
           });
           setColumns(newColumns);
         }
       }
     } catch (error) {
       setLoading(false);
-      console.error('Error uploading file: ', error);
+      console.error('Error handleGoogleSheet: ', error);
     }
   };
 

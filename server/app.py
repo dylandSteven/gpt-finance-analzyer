@@ -3,6 +3,7 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 import pandas as pd
 import os
+import time
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from googleapiclient.discovery import build
@@ -17,6 +18,7 @@ except:
 CLIENT_PATH = os.getenv('CLIENT_PATH')
 CREDENTIALS = os.getenv('CREDENTIALS')
 SPREADSHEET_ID = os.getenv('SPREADSHEET_ID')
+SHEET_IDS = os.getenv('SHEET_IDS')
 
 app = Flask(__name__, static_folder=CLIENT_PATH, static_url_path='/')
 CORS(app)
@@ -41,40 +43,54 @@ def hello():
 
 @app.route('/sheet', methods=['GET'])
 def get_sheet():
-    map_data = []
+    map_data = {}
+    filters = []
 
     try:
-        sheet = client.open('mapdata').sheet1
-        data = sheet.get_all_values()
+        spreadsheet = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+        filters = spreadsheet['sheets']
+    except Exception as err:
+        print(f'Filtering error: {str(err)}')
 
-        df = pd.DataFrame(data[1:], columns=data[0])
-        if 'Zestimate' not in df.columns: df['Zestimate'] = ''
-        df['Zestimate'] = df['Zestimate'].astype('str')
-        if 'Neighborhood' not in df.columns: df['Neighborhood'] = ''
-        df['Neighborhood'] = df['Neighborhood'].astype('str')
-        if 'lat' not in df.columns: df['lat'] = ''
-        df['lat'] = df['lat'].astype('str')
-        if 'lng' not in df.columns: df['lng'] = ''
-        df['lng'] = df['lng'].astype('str')
+    try:
+        sheet_ids = SHEET_IDS.split(',')
+        for sheet_id in sheet_ids:
+            map_data[str(sheet_id)] = []
+            sheet = client.open('mapdata').get_worksheet_by_id(sheet_id)
+            data = sheet.get_all_values()
 
-        try:
-            spreadsheet = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
-            criteria = spreadsheet['sheets'][0]['basicFilter']['criteria']
-            for key in criteria.keys():
-                if 'hiddenValues' in criteria[key]:
-                    df = df[~df[data[0][int(key)]].isin(criteria[key]['hiddenValues'])]
-        except Exception as err:
-            print(f'Filtering error: {str(err)}')
+            df = pd.DataFrame(data[1:], columns=data[0])
+            # if 'Zestimate' not in df.columns: df['Zestimate'] = ''
+            # df['Zestimate'] = df['Zestimate'].astype('str')
+            # if 'Neighborhood' not in df.columns: df['Neighborhood'] = ''
+            # df['Neighborhood'] = df['Neighborhood'].astype('str')
+            if 'lat' not in df.columns: df['lat'] = ''
+            df['lat'] = df['lat'].astype('str')
+            if 'lng' not in df.columns: df['lng'] = ''
+            df['lng'] = df['lng'].astype('str')
 
-        for index, row in df.iterrows():
-            map_data.append({
-                'type': 'Feature',
-                'geometry': {
-                    'type': 'Point',
-                    'coordinates': [float(row['lng']), float(row['lat'])]
-                },
-                'properties': row.to_dict()
-            })
+            try:
+                criteria = next((obj for obj in filters if obj['properties']['sheetId'] == sheet_id), None)
+                criteria = criteria['basicFilter']['criteria']
+                for key in criteria.keys():
+                    if 'hiddenValues' in criteria[key]:
+                        df = df[~df[data[0][int(key)]].isin(criteria[key]['hiddenValues'])]
+            except Exception as err:
+                print(f'Criteria error: {str(err)}')
+
+            for index, row in df.iterrows():
+                try:
+                    map_data[str(sheet_id)].append({
+                        'type': 'Feature',
+                        'geometry': {
+                            'type': 'Point',
+                            'coordinates': [float(row['lng']), float(row['lat'])]
+                        },
+                        'properties': row.to_dict()
+                    })
+                except Exception as er:
+                    print(f'Error in data formating: {str(er)}')
+            time.sleep(1)
     except Exception as e:
         print(f'Error in sheet api: {str(e)}')
 

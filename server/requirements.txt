@@ -6,3 +6,4 @@ python-dotenv
 requests
 oauth2client
 gspread
+google-api-python-client
