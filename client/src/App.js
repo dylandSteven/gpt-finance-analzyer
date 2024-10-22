@@ -150,22 +150,24 @@ function App() {
 
   const showColumns = () => {
     return columns.map(column => (
-      <FormControlLabel
-        style={{display: 'block'}}
-        label={column.name}
-        control={
-          <Checkbox
-            checked={column.isChecked}
-            onChange={(e) => {
-              const updatedColumns = [...columns];
-              const itemToUpdate = updatedColumns.find(obj => obj.name === e.target.value);
-              itemToUpdate.isChecked = !itemToUpdate.isChecked;
-              setColumns(updatedColumns);
-            }}
-            value={column.name}
-          />
-        }
-      />
+      <>
+        <FormControlLabel
+          label={column.name}
+          control={
+            <Checkbox
+              checked={column.isChecked}
+              onChange={(e) => {
+                const updatedColumns = [...columns];
+                const itemToUpdate = updatedColumns.find(obj => obj.name === e.target.value);
+                itemToUpdate.isChecked = !itemToUpdate.isChecked;
+                setColumns(updatedColumns);
+              }}
+              value={column.name}
+            />
+          }
+        />
+        <br />
+      </>
     ));
   }
 
@@ -178,16 +180,23 @@ function App() {
       console.log(response);
       if (response.data.features) {
         setData(response.data.features);
-        if (Object.keys(response.data.features).length > 0 && columns.length == 0 && isColumnUpdate) {
-          const newColumns = [];
-          Object.keys(response.data.features).forEach(sheet_id => {
-            Object.keys(response.data.features[sheet_id][0].properties).forEach(property => {
-              const existingColumn = newColumns.find(obj => obj.name === property);
-              if (!existingColumn) newColumns.push({ name: property, isChecked: false });
-            });
-          });
-          setColumns(newColumns);
-        }
+        // if (Object.keys(response.data.features).length > 0 && columns.length == 0 && isColumnUpdate) {
+        //   const newColumns = [];
+        //   Object.keys(response.data.features).forEach(sheet_id => {
+        //     Object.keys(response.data.features[sheet_id][0].properties).forEach(property => {
+        //       const existingColumn = newColumns.find(obj => obj.name === property);
+        //       if (!existingColumn) newColumns.push({ name: property, isChecked: false });
+        //     });
+        //   });
+        //   setColumns(newColumns);
+        // }
+      }
+      if (response.data?.visibleColumns) {
+        const newColumns = [];
+        response.data.visibleColumns.forEach(column => {
+          newColumns.push({ name: column, isChecked: false });
+        });
+        setColumns(newColumns);
       }
     } catch (error) {
       setLoading(false);
@@ -200,7 +209,6 @@ function App() {
       <div ref={mapContainerRef} style={{ width: 'calc(100% - 360px)', height: '100vh' }} />
       <div style={{width: '360px', paddingLeft: '16px', height: '100vh', overflowY: 'scroll'}}>
         <FormControlLabel
-          style={{display: 'block'}}
           label='Show Neighborhoods'
           control={
             <Checkbox
@@ -214,8 +222,8 @@ function App() {
             />
           }
         />
-        <h2>Inspection: {data[Object.keys(data)[0]].length}</h2>
-        <h2>Sold Properties: {data[Object.keys(data)[1]].length}</h2>
+        {data[Object.keys(data)[0]].length > 0 ? (<h2>Inspection: {data[Object.keys(data)[0]].length}</h2>) : ''}
+        {data[Object.keys(data)[1]].length > 0 ? (<h2>Sold Properties: {data[Object.keys(data)[1]].length}</h2>) : ''}
         <h2>Show Values</h2>
         {showColumns()}
       </div>

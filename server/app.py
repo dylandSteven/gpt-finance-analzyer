@@ -45,6 +45,7 @@ def hello():
 def get_sheet():
     map_data = {}
     filters = []
+    visibleColumns = []
 
     try:
         spreadsheet = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
@@ -59,22 +60,19 @@ def get_sheet():
             sheet = client.open('mapdata').get_worksheet_by_id(sheet_id)
             data = sheet.get_all_values()
 
-            df = pd.DataFrame(data[1:], columns=data[0])
-            # if 'Zestimate' not in df.columns: df['Zestimate'] = ''
-            # df['Zestimate'] = df['Zestimate'].astype('str')
-            # if 'Neighborhood' not in df.columns: df['Neighborhood'] = ''
-            # df['Neighborhood'] = df['Neighborhood'].astype('str')
+            df = pd.DataFrame(data[2:], columns=data[1])
+            visibleColumns.extend([data[1][i] for i, x in enumerate(data[0]) if (x == 1 or x == '1')])
             if 'lat' not in df.columns: df['lat'] = ''
             df['lat'] = df['lat'].astype('str')
             if 'lng' not in df.columns: df['lng'] = ''
             df['lng'] = df['lng'].astype('str')
 
             try:
-                criteria = next((obj for obj in filters if obj['properties']['sheetId'] == sheet_id), None)
+                criteria = next((obj for obj in filters if str(obj['properties']['sheetId']) == str(sheet_id)), None)
                 criteria = criteria['basicFilter']['criteria']
                 for key in criteria.keys():
                     if 'hiddenValues' in criteria[key]:
-                        df = df[~df[data[0][int(key)]].isin(criteria[key]['hiddenValues'])]
+                        df = df[~df[data[1][int(key)]].isin(criteria[key]['hiddenValues'])]
             except Exception as err:
                 print(f'Criteria error: {str(err)}')
 
@@ -94,7 +92,7 @@ def get_sheet():
     except Exception as e:
         print(f'Error in sheet api: {str(e)}')
 
-    return make_response(jsonify({'features': map_data}), 200)
+    return make_response(jsonify({'features': map_data, 'visibleColumns': list(set(visibleColumns))}), 200)
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
