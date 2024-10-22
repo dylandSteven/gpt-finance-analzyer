@@ -252,8 +252,10 @@ function App() {
           }
         />
         <Divider />
-        {data[Object.keys(data)[0]].length > 0 ? (<h2>Inspection: {data[Object.keys(data)[0]].length}</h2>) : ''}
-        {data[Object.keys(data)[1]].length > 0 ? (<h2>Sold Properties: {data[Object.keys(data)[1]].length}</h2>) : ''}
+        <h2>Properties</h2>
+        {data[Object.keys(data)[0]].length > 0 ? (<h4>Inspection: {data[Object.keys(data)[0]].length}</h4>) : ''}
+        {data[Object.keys(data)[1]].length > 0 ? (<h4>Sold Properties: {data[Object.keys(data)[1]].length}</h4>) : ''}
+        <Divider />
         <h2>Show Values</h2>
         {showColumns()}
       </div>
