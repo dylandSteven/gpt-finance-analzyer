@@ -1,5 +1,5 @@
 import './App.css';
-import { Checkbox, Button, FormControlLabel } from '@mui/material';
+import { Checkbox, Button, FormControlLabel, Divider } from '@mui/material';
 import { useState, useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import axios from 'axios';
@@ -16,7 +16,11 @@ function App() {
   const mapRef = useRef(null);
   const [data, setData] = useState({'0': [], '1': []});
   const [columns, setColumns] = useState([]);
-  const [isNeighborhoods, setIsNeighborhoods] = useState(true);
+  const [visibleMapSources, setVisibleMapSources] = useState({
+    isNeighborhoods: true,
+    isInspection: true,
+    isSoldProperties: true
+  });
   const columnsRef = useRef(columns);
   const [loading, setLoading] = useState(false);
 
@@ -208,20 +212,46 @@ function App() {
     <div style={{display: 'flex'}}>
       <div ref={mapContainerRef} style={{ width: 'calc(100% - 360px)', height: '100vh' }} />
       <div style={{width: '360px', paddingLeft: '16px', height: '100vh', overflowY: 'scroll'}}>
+        <h2>Show Map</h2>
         <FormControlLabel
-          label='Show Neighborhoods'
+          label='Neighborhoods'
           control={
             <Checkbox
-              checked={isNeighborhoods}
+              checked={visibleMapSources.isNeighborhoods}
               onChange={(e) => {
                 neighborhoods.forEach((neighborhood, i) => {
-                  mapRef.current.setLayoutProperty(`polygon${i}`, 'visibility', !isNeighborhoods? 'visible' : 'none');
+                  mapRef.current.setLayoutProperty(`polygon${i}`, 'visibility', !visibleMapSources.isNeighborhoods? 'visible' : 'none');
                 });
-                setIsNeighborhoods(!isNeighborhoods);
+                setVisibleMapSources({...visibleMapSources, isNeighborhoods: !visibleMapSources.isNeighborhoods});
+              }}
+            />
+          }
+        /><br />
+        <FormControlLabel
+          label='Inspection'
+          control={
+            <Checkbox
+              checked={visibleMapSources.isInspection}
+              onChange={(e) => {
+                mapRef.current.setLayoutProperty('points-layer0', 'visibility', !visibleMapSources.isInspection? 'visible' : 'none');
+                setVisibleMapSources({...visibleMapSources, isInspection: !visibleMapSources.isInspection});
+              }}
+            />
+          }
+        /><br />
+        <FormControlLabel
+          label='Sold Properties'
+          control={
+            <Checkbox
+              checked={visibleMapSources.isSoldProperties}
+              onChange={(e) => {
+                mapRef.current.setLayoutProperty('points-layer1', 'visibility', !visibleMapSources.isSoldProperties? 'visible' : 'none');
+                setVisibleMapSources({...visibleMapSources, isSoldProperties: !visibleMapSources.isSoldProperties});
               }}
             />
           }
         />
+        <Divider />
         {data[Object.keys(data)[0]].length > 0 ? (<h2>Inspection: {data[Object.keys(data)[0]].length}</h2>) : ''}
         {data[Object.keys(data)[1]].length > 0 ? (<h2>Sold Properties: {data[Object.keys(data)[1]].length}</h2>) : ''}
         <h2>Show Values</h2>
