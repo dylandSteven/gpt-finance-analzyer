@@ -45,7 +45,7 @@ def hello():
 def get_sheet():
     map_data = {}
     filters = []
-    visibleColumns = []
+    visibleColumns = {}
 
     try:
         spreadsheet = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
@@ -61,7 +61,7 @@ def get_sheet():
             data = sheet.get_all_values()
 
             df = pd.DataFrame(data[2:], columns=data[1])
-            visibleColumns.extend([data[1][i] for i, x in enumerate(data[0]) if (x == 1 or x == '1')])
+            visibleColumns[str(sheet_id)] = [data[1][i] for i, x in enumerate(data[0]) if (x == 1 or x == '1')]
             if 'lat' not in df.columns: df['lat'] = ''
             df['lat'] = df['lat'].astype('str')
             if 'lng' not in df.columns: df['lng'] = ''
@@ -92,7 +92,7 @@ def get_sheet():
     except Exception as e:
         print(f'Error in sheet api: {str(e)}')
 
-    return make_response(jsonify({'features': map_data, 'visibleColumns': list(set(visibleColumns))}), 200)
+    return make_response(jsonify({'features': map_data, 'visibleColumns': visibleColumns}), 200)
 
 @app.route('/upload', methods=['POST'])
 def upload_file():

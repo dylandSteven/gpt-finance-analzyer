@@ -15,7 +15,7 @@ function App() {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const [data, setData] = useState({'0': [], '1': []});
-  const [columns, setColumns] = useState([]);
+  const [columns, setColumns] = useState({'0': [], '1': []});
   const [visibleMapSources, setVisibleMapSources] = useState({
     isNeighborhoods: true,
     isInspection: true,
@@ -103,12 +103,11 @@ function App() {
           mapRef.current.on('click', `points-layer${index}`, (e) => {
             const coordinates = e.features[0].geometry.coordinates.slice();
             const details = e.features[0].properties;
-            let innerHtml = '<strong>Description</strong>';
-            const visibleColumns = columnsRef.current.filter(obj => obj.isChecked);
-            console.log(visibleColumns);
+            let innerHtml = '';
+            const visibleColumns = columnsRef.current[Object.keys(columnsRef.current)[index]].filter(obj => obj.isChecked);
             Object.keys(details).forEach(property => {
               if (visibleColumns.find(obj => obj.name == property)) {
-                innerHtml += `<br/><span>${property}: ${details[property]}</span>`
+                innerHtml += `<br/><span><strong>${property}:</strong> ${details[property]}</span>`
               }
             });
             popup
@@ -150,29 +149,33 @@ function App() {
 
   useEffect(() => {
     columnsRef.current = columns;
+    console.log(columns);
   }, [columns]);
 
   const showColumns = () => {
-    return columns.map(column => (
-      <>
-        <FormControlLabel
-          label={column.name}
-          control={
-            <Checkbox
-              checked={column.isChecked}
-              onChange={(e) => {
-                const updatedColumns = [...columns];
-                const itemToUpdate = updatedColumns.find(obj => obj.name === e.target.value);
-                itemToUpdate.isChecked = !itemToUpdate.isChecked;
-                setColumns(updatedColumns);
-              }}
-              value={column.name}
-            />
-          }
-        />
-        <br />
-      </>
-    ));
+    return Object.keys(columns).map((sheet_id, index) => {
+      return columns[sheet_id].map(column => (
+        <>
+          <FormControlLabel
+            label={column.name}
+            style={index == 0 ? {color: 'red'} : {color: 'black'}}
+            control={
+              <Checkbox
+                checked={column.isChecked}
+                onChange={(e) => {
+                  const updatedColumns = [...columns[sheet_id]];
+                  const itemToUpdate = updatedColumns.find(obj => obj.name === e.target.value);
+                  itemToUpdate.isChecked = !itemToUpdate.isChecked;
+                  setColumns({...columns, [sheet_id]: updatedColumns});
+                }}
+                value={column.name}
+              />
+            }
+          />
+          <br />
+        </>
+      ));
+    });
   }
 
   const handleGoogleSheet = async (isColumnUpdate=false) => {
@@ -196,10 +199,15 @@ function App() {
         // }
       }
       if (response.data?.visibleColumns) {
-        const newColumns = [];
-        response.data.visibleColumns.forEach(column => {
-          newColumns.push({ name: column, isChecked: false });
+        const newColumns = {};
+        const visibleColumns = response.data.visibleColumns;
+        Object.keys(visibleColumns).forEach(sheet_id => {
+          newColumns[sheet_id] = [];
+          visibleColumns[sheet_id].forEach(column => {
+            newColumns[sheet_id].push({ name: column, isChecked: false });
+          });
         });
+        console.log(newColumns);
         setColumns(newColumns);
       }
     } catch (error) {
