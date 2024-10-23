@@ -123,7 +123,7 @@ function App() {
         });
       });
 
-      await handleGoogleSheet(true);
+      await handleGoogleSheet();
       // setTimeout(() => {
       //   setInterval(() => {
       //     handleGoogleSheet();
@@ -149,7 +149,6 @@ function App() {
 
   useEffect(() => {
     columnsRef.current = columns;
-    console.log(columns);
   }, [columns]);
 
   const showColumns = () => {
@@ -178,7 +177,7 @@ function App() {
     });
   }
 
-  const handleGoogleSheet = async (isColumnUpdate=false) => {
+  const handleGoogleSheet = async () => {
     setLoading(true);
 
     try {
@@ -187,16 +186,6 @@ function App() {
       console.log(response);
       if (response.data.features) {
         setData(response.data.features);
-        // if (Object.keys(response.data.features).length > 0 && columns.length == 0 && isColumnUpdate) {
-        //   const newColumns = [];
-        //   Object.keys(response.data.features).forEach(sheet_id => {
-        //     Object.keys(response.data.features[sheet_id][0].properties).forEach(property => {
-        //       const existingColumn = newColumns.find(obj => obj.name === property);
-        //       if (!existingColumn) newColumns.push({ name: property, isChecked: false });
-        //     });
-        //   });
-        //   setColumns(newColumns);
-        // }
       }
       if (response.data?.visibleColumns) {
         const newColumns = {};
@@ -207,7 +196,6 @@ function App() {
             newColumns[sheet_id].push({ name: column, isChecked: false });
           });
         });
-        console.log(newColumns);
         setColumns(newColumns);
       }
     } catch (error) {
@@ -220,7 +208,15 @@ function App() {
     <div style={{display: 'flex'}}>
       <div ref={mapContainerRef} style={{ width: 'calc(100% - 360px)', height: '100vh' }} />
       <div style={{width: '360px', paddingLeft: '16px', height: '100vh', overflowY: 'scroll'}}>
-        <h2>Show Map</h2>
+        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+          <h2>Show Map</h2>
+          <img
+            src='refresh.svg'
+            alt='refresh'
+            style={{width: '18px', paddingRight: '15px', cursor: 'pointer'}}
+            onClick={() => { handleGoogleSheet(); }}
+          />
+        </div>
         <FormControlLabel
           label='Neighborhoods'
           control={
@@ -267,6 +263,17 @@ function App() {
         <h2>Show Values</h2>
         {showColumns()}
       </div>
+      {loading ? (<div style={{
+          display: 'flex',
+          position: 'fixed',
+          width: '100%',
+          height: '100vh',
+          zIndex: 1,
+          background: '#000000e0',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}><h1 style={{color: 'white'}}>Loading...</h1></div>) :
+      ''}
     </div>
   );
 }
