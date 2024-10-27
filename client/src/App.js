@@ -1,6 +1,9 @@
 import './App.css';
 import { Checkbox, Button, FormControlLabel, Divider } from '@mui/material';
 import { useState, useEffect, useRef } from 'react';
+import { createRoot } from 'react-dom/client';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import mapboxgl from 'mapbox-gl';
 import axios from 'axios';
 import { neighborhoods } from './data';
@@ -14,27 +17,71 @@ function App() {
 
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
-  const [data, setData] = useState({'0': [], '1': []});
-  const [columns, setColumns] = useState({'0': [], '1': []});
+  const [data, setData] = useState({'inspection': [], 'favorite': [], 'sold_properties': [], 'past_sale': []});
+  const dataRef = useRef(data);
+  const [columns, setColumns] = useState({'0': [], '1': [], '2': []});
+  const columnsRef = useRef(columns);
+  const [popups, setPopups] = useState([]);
+  const popupsRef = useRef(popups);
   const [visibleMapSources, setVisibleMapSources] = useState({
     isNeighborhoods: true,
-    isInspection: true,
-    isSoldProperties: true
+    inspection: true,
+    favorite: true,
+    sold_properties: true,
+    past_sale: true
   });
-  const columnsRef = useRef(columns);
   const [loading, setLoading] = useState(false);
+
+  const updateFavorite = async (isMarked, details) => {
+    const originKey = isMarked ? 'favorite' : 'inspection', moveKey = isMarked ? 'inspection' : 'favorite';
+    const selectedItem = dataRef.current[originKey].find(item => item['properties']['Property Location'] === details['Property Location']);
+    selectedItem['properties']['Favorite properties'] = isMarked ? '' : '1';
+    setData({
+      ...dataRef.current,
+      [originKey]: dataRef.current[originKey].filter(item => item['properties']['Property Location'] !== details['Property Location']),
+      [moveKey]: [...dataRef.current[moveKey], selectedItem]
+    });
+    popupsRef.current.forEach(popup => { popup.remove(); });
+    popupsRef.current = [];
+    setLoading(true);
+    const response = await axios.post(`${serverUrl}/update`, { propertyLocation: details['Property Location'], isFavorite: !isMarked });
+    if (response.status !== 200) alert('Request Failed');
+    setLoading(false);
+  };
+
+  const PopupContent = ({innerHtml, visible, favorite, details}) => (
+    <div>
+      <div style={{display: 'flex', justifyContent: 'flex-end', marginBottom: '5px'}}>
+        {visible ? (
+          favorite ? (
+            <FavoriteIcon
+              style={{fontSize: '18px', cursor: 'pointer'}}
+              onClick={() => { updateFavorite(favorite, details); }}
+            />
+          ) : (
+            <FavoriteBorderIcon
+              style={{fontSize: '18px', cursor: 'pointer'}}
+              onClick={() => { updateFavorite(favorite, details); }}
+            />
+          )
+        ) : ''}
+
+      </div>
+      <div dangerouslySetInnerHTML={{ __html: innerHtml }} />
+    </div>
+  );  
 
   useEffect(() => {
     // Initialize map
     mapRef.current = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: 'mapbox://styles/mapbox/streets-v11',
-      center: [-89.950535, 35.156449], // Center on the USA
+      center: [-89.950535, 35.156449],
       zoom: 11
     });
 
-    // Add points as GeoJSON source
     mapRef.current.on('load', async () => {
+      let popups = [];
       ////////// Draw Neighborhood Areas //////////
       neighborhoods.forEach((neighborhood, i) => {
         mapRef.current.addSource(`polygon${i}`, {
@@ -66,13 +113,20 @@ function App() {
         });
       });
 
-      Object.keys(data).forEach((sheet_id, index) => {
-        ////////// Draw Neighborhood Areas //////////
-        mapRef.current.loadImage(`pin${index}.png`, async (error, image) => {
-          if (error) throw error;
-          mapRef.current.addImage(`pin${index}`, image);
+      mapRef.current.on('click', () => {
+        popupsRef.current.forEach(popup => {
+          popup.remove();
+        });
+        popupsRef.current = [];
+      });
 
-          mapRef.current.addSource(`points${index}`, {
+      Object.keys(data).forEach((sheet_id) => {
+        ////////// Draw Neighborhood Areas //////////
+        mapRef.current.loadImage(`pin-${sheet_id}.png`, async (error, image) => {
+          if (error) throw error;
+          mapRef.current.addImage(`pin${sheet_id}`, image);
+
+          mapRef.current.addSource(`points${sheet_id}`, {
             'type': 'geojson',
             'data': {
               'type': 'FeatureCollection',
@@ -81,11 +135,11 @@ function App() {
           });
     
           mapRef.current.addLayer({
-            'id': `points-layer${index}`,
+            'id': `points-layer${sheet_id}`,
             'type': 'symbol',
-            'source': `points${index}`,
+            'source': `points${sheet_id}`,
             'layout': {
-              'icon-image': `pin${index}`,
+              'icon-image': `pin${sheet_id}`,
               'icon-size': 0.05,
               'icon-allow-overlap': true
             }
@@ -96,29 +150,37 @@ function App() {
             closeOnClick: false
           });
     
-          mapRef.current.on('mouseenter', `points-layer${index}`, () => {
+          mapRef.current.on('mouseenter', `points-layer${sheet_id}`, () => {
             mapRef.current.getCanvas().style.cursor = 'pointer';
           });
 
-          mapRef.current.on('click', `points-layer${index}`, (e) => {
+          mapRef.current.on('click', `points-layer${sheet_id}`, (e) => {
             const coordinates = e.features[0].geometry.coordinates.slice();
             const details = e.features[0].properties;
             let innerHtml = '';
-            const visibleColumns = columnsRef.current[Object.keys(columnsRef.current)[index]].filter(obj => obj.isChecked);
+            let key_id = sheet_id;
+            if (sheet_id === 'favorite') key_id = 'inspection';
+            const visibleColumns = columnsRef.current[key_id].filter(obj => obj.isChecked);
             Object.keys(details).forEach(property => {
-              if (visibleColumns.find(obj => obj.name == property)) {
-                innerHtml += `<br/><span><strong>${property}:</strong> ${details[property]}</span>`
+              if (visibleColumns.find(obj => obj.name === property)) {
+                innerHtml += `<span style='display: block;'><strong>${property}:</strong> ${details[property]}</span>`
               }
             });
+            const popupNode = document.createElement('div');
+            const root = createRoot(popupNode);
+            root.render(
+              <PopupContent
+                innerHtml={innerHtml}
+                visible={sheet_id === 'inspection' || sheet_id === 'favorite'}
+                favorite={details?.['Favorite properties']?.toString() === '1'}
+                details={details}
+              />
+            );
             popup
               .setLngLat(coordinates)
-              .setHTML(innerHtml)
+              .setDOMContent(popupNode)
               .addTo(mapRef.current);
-          });
-    
-          mapRef.current.on('mouseleave', `points-layer${index}`, () => {
-            mapRef.current.getCanvas().style.cursor = '';
-            popup.remove();
+            setPopups([...popups, popup]);
           });
         });
       });
@@ -136,28 +198,33 @@ function App() {
 
   useEffect(() => {
     if (mapRef.current) {
-      Object.keys(data).forEach((sheet_id, index) => {
-        if (mapRef.current.getSource(`points${index}`)) {
-          mapRef.current.getSource(`points${index}`).setData({
+      Object.keys(data).forEach((sheet_id) => {
+        if (mapRef.current.getSource(`points${sheet_id}`)) {
+          mapRef.current.getSource(`points${sheet_id}`).setData({
             'type': 'FeatureCollection',
             'features': data[sheet_id]
           });
         }
       });
     }
+    dataRef.current = data;
   }, [data]);
 
   useEffect(() => {
     columnsRef.current = columns;
   }, [columns]);
 
+  useEffect(() => {
+    popupsRef.current = popups;
+  }, [popups]);
+
   const showColumns = () => {
-    return Object.keys(columns).map((sheet_id, index) => {
+    return Object.keys(columns).map((sheet_id) => {
       return columns[sheet_id].map(column => (
         <>
           <FormControlLabel
             label={column.name}
-            style={index == 0 ? {color: 'red'} : {color: 'black'}}
+            style={sheet_id === 'sold_properties' ? {color: 'black'} : (sheet_id === 'past_sale' ? {color: 'orange'} : {color : 'red'})}
             control={
               <Checkbox
                 checked={column.isChecked}
@@ -175,6 +242,23 @@ function App() {
         </>
       ));
     });
+  }
+
+  const showMapLayers = () => {
+    return Object.keys(data).map(key => (
+      <FormControlLabel
+        label={key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+        control={
+          <Checkbox
+            checked={visibleMapSources[key]}
+            onChange={(e) => {
+              mapRef.current.setLayoutProperty(`points-layer${key}`, 'visibility', !visibleMapSources[key]? 'visible' : 'none');
+              setVisibleMapSources({...visibleMapSources, [key]: !visibleMapSources[key]});
+            }}
+          />
+        }
+      />
+    ));
   }
 
   const handleGoogleSheet = async () => {
@@ -230,35 +314,14 @@ function App() {
               }}
             />
           }
-        /><br />
-        <FormControlLabel
-          label='Inspection'
-          control={
-            <Checkbox
-              checked={visibleMapSources.isInspection}
-              onChange={(e) => {
-                mapRef.current.setLayoutProperty('points-layer0', 'visibility', !visibleMapSources.isInspection? 'visible' : 'none');
-                setVisibleMapSources({...visibleMapSources, isInspection: !visibleMapSources.isInspection});
-              }}
-            />
-          }
-        /><br />
-        <FormControlLabel
-          label='Sold Properties'
-          control={
-            <Checkbox
-              checked={visibleMapSources.isSoldProperties}
-              onChange={(e) => {
-                mapRef.current.setLayoutProperty('points-layer1', 'visibility', !visibleMapSources.isSoldProperties? 'visible' : 'none');
-                setVisibleMapSources({...visibleMapSources, isSoldProperties: !visibleMapSources.isSoldProperties});
-              }}
-            />
-          }
         />
+        {showMapLayers()}
         <Divider />
         <h2>Properties</h2>
-        {data[Object.keys(data)[0]].length > 0 ? (<h4>Inspection: {data[Object.keys(data)[0]].length}</h4>) : ''}
-        {data[Object.keys(data)[1]].length > 0 ? (<h4>Sold Properties: {data[Object.keys(data)[1]].length}</h4>) : ''}
+        <h4>Inspection: {data['inspection'].length}</h4>
+        <h4 style={{paddingLeft: '16px'}}>Favorite: {data['favorite'].length}</h4>
+        <h4>Sold Properties: {data['sold_properties'].length}</h4>
+        <h4>Past Sale: {data['past_sale'].length}</h4>
         <Divider />
         <h2>Show Values</h2>
         {showColumns()}

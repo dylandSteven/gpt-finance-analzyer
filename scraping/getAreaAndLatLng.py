@@ -34,28 +34,31 @@ def main():
     for index, row in df.iterrows():
         try:
             address = df.at[index, 'Property Location']
-            if address != '4711 Owen Ave': continue
-            city = df.at[index, 'City'] 
-            state = df.at[index, 'State']
-            full_address = f'{address} {city} {state}'
+            # city = df.at[index, 'City'] 
+            # state = df.at[index, 'State']
+            # full_address = f'{address} {city} {state}'
+            full_address = df.at[index, 'Full Address']
             data = getArea(full_address)
             print(data)
             address_items = address.split(' ')
-            if address_items[0] not in data['formatted_address']:
-                print(address)
-                address = ' '.join(address_items[:-1])
-                full_address = f'{address} {city} {state}'
-                data = getArea(full_address)
-                print(data)
-                if address.split(' ')[0] not in data['formatted_address']: continue
-                # o_lat = '{:4f}'.format(float(df.at[index, 'lat']))
-                # o_lng = '{:4f}'.format(float(df.at[index, 'lng']))
-                # n_lat = '{:4f}'.format(data['lat'])
-                # n_lng = '{:4f}'.format(data['lng'])
+            # if address_items[0] not in data['formatted_address']:
+            #     print(address)
+            #     address = ' '.join(address_items[:-1])
+            #     full_address = f'{address} {city} {state}'
+            #     data = getArea(full_address)
+            #     print(data)
+            #     if address.split(' ')[0] not in data['formatted_address']: continue
+            #     # o_lat = '{:4f}'.format(float(df.at[index, 'lat']))
+            #     # o_lng = '{:4f}'.format(float(df.at[index, 'lng']))
+            #     # n_lat = '{:4f}'.format(data['lat'])
+            #     # n_lng = '{:4f}'.format(data['lng'])
+            if address_items[0] in data['formatted_address']:
                 df.at[index, 'Area'] = data['area']
                 df.at[index, 'lat'] = data['lat']
                 df.at[index, 'lng'] = data['lng']
                 df.to_csv(CSV_FILE_PATH, index=False)
+            else:
+                print("=== wrong: ", full_address)
         except Exception as e:
             print(f'err: {str(e)}')
 

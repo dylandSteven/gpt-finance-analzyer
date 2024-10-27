@@ -9,7 +9,6 @@ CSV_FILE_PATH = os.getenv('CSV_FILE_PATH')
 with open('neighborhoods.json', 'r') as f:
     data = json.load(f)
 
-wrong_addresses = ['1758 Victoria Ave', '4828 Pine Forest Dr', '1683 S Prescott St', '4143 Owen Ave', '3915 Oak Branch #Cl', '4711 Owen Ave', '4433 Owen Ave', '4053 Clearpool', '5558 Oak Branch #Cl']
 def getNeighborhood(point):
     for item in data:
         polygon = Polygon(item['geometry']['coordinates'][0])
@@ -27,7 +26,6 @@ def main():
     df['Neighborhood'] = df['Neighborhood'].astype('str')
 
     for index, address in enumerate(addresses):
-        if address not in wrong_addresses: continue
         point = Point([float(df.at[index, 'lng']), float(df.at[index, 'lat'])])
         data = getNeighborhood(point)
         print(index, address)

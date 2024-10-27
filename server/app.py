@@ -19,6 +19,7 @@ CLIENT_PATH = os.getenv('CLIENT_PATH')
 CREDENTIALS = os.getenv('CREDENTIALS')
 SPREADSHEET_ID = os.getenv('SPREADSHEET_ID')
 SHEET_IDS = os.getenv('SHEET_IDS')
+GOOGLE_SHEET = 'mapdata'
 
 app = Flask(__name__, static_folder=CLIENT_PATH, static_url_path='/')
 CORS(app)
@@ -55,20 +56,25 @@ def get_sheet():
 
     try:
         sheet_ids = SHEET_IDS.split(',')
-        for sheet_id in sheet_ids:
-            map_data[str(sheet_id)] = []
-            sheet = client.open('mapdata').get_worksheet_by_id(sheet_id)
+        for index, sheet_id in enumerate(sheet_ids):
+            sheet_name = sheet_id.split('-')[0]
+            sheet_no = sheet_id.split('-')[1]
+            map_data[sheet_name] = []
+            if sheet_name == 'inspection':
+                map_data['favorite'] = []
+            print("===", sheet_no)
+            sheet = client.open(GOOGLE_SHEET).get_worksheet_by_id(sheet_no)
             data = sheet.get_all_values()
 
             df = pd.DataFrame(data[2:], columns=data[1])
-            visibleColumns[str(sheet_id)] = [data[1][i] for i, x in enumerate(data[0]) if (x == 1 or x == '1')]
+            visibleColumns[sheet_name] = [data[1][i] for i, x in enumerate(data[0]) if (x == 1 or x == '1')]
             if 'lat' not in df.columns: df['lat'] = ''
             df['lat'] = df['lat'].astype('str')
             if 'lng' not in df.columns: df['lng'] = ''
             df['lng'] = df['lng'].astype('str')
 
             try:
-                criteria = next((obj for obj in filters if str(obj['properties']['sheetId']) == str(sheet_id)), None)
+                criteria = next((obj for obj in filters if str(obj['properties']['sheetId']) == sheet_no), None)
                 criteria = criteria['basicFilter']['criteria']
                 for key in criteria.keys():
                     if 'hiddenValues' in criteria[key]:
@@ -76,9 +82,12 @@ def get_sheet():
             except Exception as err:
                 print(f'Criteria error: {str(err)}')
 
-            for index, row in df.iterrows():
+            for itr, row in df.iterrows():
                 try:
-                    map_data[str(sheet_id)].append({
+                    key_name = sheet_name
+                    if sheet_name == 'inspection' and str(row['Favorite properties']) == '1':
+                        key_name = 'favorite'
+                    map_data[key_name].append({
                         'type': 'Feature',
                         'geometry': {
                             'type': 'Point',
@@ -93,6 +102,22 @@ def get_sheet():
         print(f'Error in sheet api: {str(e)}')
 
     return make_response(jsonify({'features': map_data, 'visibleColumns': visibleColumns}), 200)
+
+@app.route('/update', methods=['POST'])
+def update_cell():
+    json_data = request.get_json()
+    if json_data:
+        property_location = json_data['propertyLocation']
+        isFavorite = json_data['isFavorite']
+    sheet_ids = SHEET_IDS.split(',')
+    sheet_id = sheet_ids[0]
+    sheet_no = sheet_id.split('-')[1]
+    sheet = client.open(GOOGLE_SHEET).get_worksheet_by_id(sheet_no)
+    data = sheet.get_all_values()
+    property_location_index = next((i for i, item in enumerate(data[1]) if item == 'Property Location'), None)
+    row_index = next((i for i, item in enumerate(data) if item[property_location_index] == property_location), None)
+    sheet.update([['1' if isFavorite else '']], f'Y{row_index + 1}')
+    return make_response(jsonify({'msg': 'Updated!'}), 200)
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
