@@ -1,11 +1,12 @@
 import './App.css';
-import { Checkbox, Button, FormControlLabel, Divider } from '@mui/material';
+import { Checkbox, FormControlLabel, Divider } from '@mui/material';
 import { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import mapboxgl from 'mapbox-gl';
 import axios from 'axios';
+import * as turf from '@turf/turf';
 import { neighborhoods } from './data';
 
 mapboxgl.accessToken = 'pk.eyJ1IjoiZHlsYW5kc2FsZGFuYSIsImEiOiJjbTI0dXhobnMwNGdoMnFxM2VwZzM5bzAxIn0.2PL3TnBGqeXWDN5XVlL-BA';
@@ -13,7 +14,7 @@ mapboxgl.accessToken = 'pk.eyJ1IjoiZHlsYW5kc2FsZGFuYSIsImEiOiJjbTI0dXhobnMwNGdoM
 function App() {
   const serverUrl = 'http://analyzer-1636149603.us-east-1.elb.amazonaws.com';
   // const serverUrl = 'http://localhost:8000';
-  const INTERVAL_SECONDS = 30000;
+  // const INTERVAL_SECONDS = 30000;
 
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -23,6 +24,8 @@ function App() {
   const columnsRef = useRef(columns);
   const [popups, setPopups] = useState([]);
   const popupsRef = useRef(popups);
+  const [ndKeys, setNdKeys] = useState({});
+  const [neighborhoodTexts, setNeighborhoodTexts] = useState([]);
   const [visibleMapSources, setVisibleMapSources] = useState({
     isNeighborhoods: true,
     inspection: true,
@@ -82,8 +85,21 @@ function App() {
 
     mapRef.current.on('load', async () => {
       let popups = [];
+      const _neighborhoodTexts = [];
       ////////// Draw Neighborhood Areas //////////
+      setLoading(true);
+      const response = await axios.get(`${serverUrl}/neighborhoods`);
+      const { neighborhoods: neighborhoodsDetails, keys: _ndKeys } = response.data;
+      const ndKeysTmp = {};
+      _ndKeys.forEach(_ndKey => { ndKeysTmp[_ndKey] = false; })
+      setNdKeys(ndKeysTmp);
+      setLoading(false);
       neighborhoods.forEach((neighborhood, i) => {
+        const neighborhoodDetailKey = Object.keys(neighborhoodsDetails).find(key => neighborhood.properties.location.includes(key));
+        const neighborhoodDetail = neighborhoodsDetails[neighborhoodDetailKey];
+        const centroid = turf.centroid(neighborhood);
+        const [lng, lat] = centroid.geometry.coordinates;
+
         mapRef.current.addSource(`polygon${i}`, {
           'type': 'geojson',
           'data': {
@@ -111,7 +127,30 @@ function App() {
             'line-width': 1
           }
         });
+
+        const addNeighborhoodDetail = (lng, lat, text) => {
+          const textElement = document.createElement('div');
+          textElement.style.fontSize = '16px';
+          textElement.style.color = 'black';
+          textElement.style.backgroundColor = 'white';
+          textElement.style.padding = '2px 5px';
+          textElement.style.borderRadius = '3px';
+          textElement.style.display = 'none';
+          textElement.textContent = text;
+          new mapboxgl.Marker({ element: textElement })
+            .setLngLat([lng, lat])
+            .addTo(mapRef.current);
+          return textElement;
+        };
+
+        if (neighborhoodDetail) {
+          Object.keys(neighborhoodDetail).forEach(key => {
+            const textElement = addNeighborhoodDetail(lng, lat, neighborhoodDetail[key]);
+            _neighborhoodTexts.push({name: key, textElement});
+          });
+        }
       });
+      setNeighborhoodTexts(_neighborhoodTexts);
 
       mapRef.current.on('click', () => {
         popupsRef.current.forEach(popup => {
@@ -261,6 +300,27 @@ function App() {
     ));
   }
 
+  const showNeighborhoodDetails = () => {
+    return Object.keys(ndKeys).map(key => (
+      <FormControlLabel
+        label={key}
+        control={
+          <Checkbox
+            checked={ndKeys[key]}
+            onChange={(e) => {
+              setNdKeys({...ndKeys, [key]: !ndKeys[key]});
+              neighborhoodTexts.forEach(neighborhoodText => {
+                if (neighborhoodText.name === key) {
+                  neighborhoodText.textElement.style.display = !ndKeys[key] ? 'block' : 'none';
+                }
+              });
+            }}
+          />
+        }
+      />
+    ));
+  }
+
   const handleGoogleSheet = async () => {
     setLoading(true);
 
@@ -322,6 +382,9 @@ function App() {
         <h4 style={{paddingLeft: '16px'}}>Favorite: {data['favorite'].length}</h4>
         <h4>Sold Properties: {data['sold_properties'].length}</h4>
         <h4>Past Sale: {data['past_sale'].length}</h4>
+        <Divider />
+        <h2>Neighborhoods</h2>
+        {showNeighborhoodDetails()}
         <Divider />
         <h2>Show Values</h2>
         {showColumns()}

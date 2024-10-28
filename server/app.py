@@ -59,6 +59,7 @@ def get_sheet():
         for index, sheet_id in enumerate(sheet_ids):
             sheet_name = sheet_id.split('-')[0]
             sheet_no = sheet_id.split('-')[1]
+            if sheet_name == 'neighborhoods': continue
             map_data[sheet_name] = []
             if sheet_name == 'inspection':
                 map_data['favorite'] = []
@@ -102,6 +103,27 @@ def get_sheet():
         print(f'Error in sheet api: {str(e)}')
 
     return make_response(jsonify({'features': map_data, 'visibleColumns': visibleColumns}), 200)
+
+@app.route('/neighborhoods', methods=['GET'])
+def get_neighborhoods():
+    neighborhoods = {}
+    try:
+        sheet_ids = SHEET_IDS.split(',')
+        for index, sheet_id in enumerate(sheet_ids):
+            sheet_name = sheet_id.split('-')[0]
+            sheet_no = sheet_id.split('-')[1]
+            if sheet_name != 'neighborhoods': continue
+            sheet = client.open(GOOGLE_SHEET).get_worksheet_by_id(sheet_no)
+            data = sheet.get_all_values()
+            for row in data[1:]: # Ignore columns
+                neighborhoods[row[0]] = {}
+                for index, key in enumerate(data[0]):
+                    if index < 2: continue # Ignore 'Neighborhood Name' and 'Level of Crime'
+                    neighborhoods[row[0]][key] = row[index]
+    except Exception as e:
+        print(f'Error in neighborhoods api: {str(e)}')
+
+    return make_response(jsonify({'neighborhoods': neighborhoods, 'keys': data[0][2:]}), 200)
 
 @app.route('/update', methods=['POST'])
 def update_cell():
