@@ -22,15 +22,15 @@ def getNeighborhood(point):
 def main():
     df = pd.read_csv(CSV_FILE_PATH)
     addresses = df['Property Location'].tolist()
-    if 'Neighborhood' not in df.columns: df['Neighborhood'] = ''
-    df['Neighborhood'] = df['Neighborhood'].astype('str')
+    if 'Neighborhood name' not in df.columns: df['Neighborhood name'] = ''
+    df['Neighborhood name'] = df['Neighborhood name'].astype('str')
 
     for index, address in enumerate(addresses):
         point = Point([float(df.at[index, 'lng']), float(df.at[index, 'lat'])])
         data = getNeighborhood(point)
         print(index, address)
-        df.at[index, 'Neighborhood'] = data['neighborhood']
-        if data['crimelevel'] > -1: df.at[index, 'Neighborhood crime score'] = data['crimelevel'] 
+        df.at[index, 'Neighborhood name'] = data['neighborhood']
+        # if data['crimelevel'] > -1: df.at[index, 'Neighborhood crime score'] = data['crimelevel']
         df.to_csv(CSV_FILE_PATH, index=False)
 
 main()
