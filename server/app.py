@@ -86,13 +86,18 @@ def get_sheet():
             for itr, row in df.iterrows():
                 try:
                     key_name = sheet_name
-                    if sheet_name == 'inspection' and str(row['Favorite properties']) == '1':
+                    if sheet_name == 'inspection' and int(row['Favorite properties']) == 1:
                         key_name = 'favorite'
+                    coordinates = [-100, -100]
+                    try:
+                        coordinates[0] = float(row['lng'])
+                        coordinates[1] = float(row['lat'])
+                    except: pass
                     map_data[key_name].append({
                         'type': 'Feature',
                         'geometry': {
                             'type': 'Point',
-                            'coordinates': [float(row['lng']), float(row['lat'])]
+                            'coordinates': coordinates
                         },
                         'properties': row.to_dict()
                     })
