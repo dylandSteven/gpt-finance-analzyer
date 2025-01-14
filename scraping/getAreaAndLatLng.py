@@ -33,19 +33,22 @@ def main():
 
     for index, row in df.iterrows():
         try:
+            # address = df.at[index, 'Full Address']
+            # city = df.at[index, 'City']
+            # state = df.at[index, 'State']
+            # full_address = f'{address} {city} {state}'
             address = df.at[index, 'Property Location']
-            city = df.at[index, 'City'] 
-            state = df.at[index, 'State']
-            full_address = f'{address} {city} {state}'
+            city = df.at[index, 'City']
+            full_address = f'{address} {city}'
             data = getArea(full_address)
             address_items = address.split(' ')
             if address_items[0] not in data['formatted_address']:
                 print(address)
                 address = ' '.join(address_items[:-1])
-                full_address = f'{address} {city} {state}'
+                full_address = f'{address} {city}'
                 data = getArea(full_address)
                 if address.split(' ')[0] not in data['formatted_address']: continue
-            # df.at[index, 'Area'] = data['area']
+            df.at[index, 'Area'] = data['area']
             df.at[index, 'lat'] = data['lat']
             df.at[index, 'lng'] = data['lng']
             df.to_csv(CSV_FILE_PATH, index=False)

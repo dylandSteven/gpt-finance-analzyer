@@ -2,3 +2,4 @@ server_info
 # scraping
 *.csv
 .env
+scraping/

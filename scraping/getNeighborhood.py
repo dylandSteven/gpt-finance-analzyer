@@ -21,7 +21,7 @@ def getNeighborhood(point):
 
 def main():
     df = pd.read_csv(CSV_FILE_PATH)
-    addresses = df['Property Location'].tolist()
+    addresses = df['address'].tolist()
     if 'Neighborhood name' not in df.columns: df['Neighborhood name'] = ''
     df['Neighborhood name'] = df['Neighborhood name'].astype('str')
 
