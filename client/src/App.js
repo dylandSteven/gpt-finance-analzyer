@@ -12,8 +12,8 @@ import { neighborhoods } from './data';
 mapboxgl.accessToken = 'pk.eyJ1IjoiZHlsYW5kc2FsZGFuYSIsImEiOiJjbTI0dXhobnMwNGdoMnFxM2VwZzM5bzAxIn0.2PL3TnBGqeXWDN5XVlL-BA';
 
 function App() {
-  // const serverUrl = 'http://analyzer-1636149603.us-east-1.elb.amazonaws.com';
-  const serverUrl = 'http://localhost:8000';
+  const serverUrl = 'http://3.89.123.195';
+  // const serverUrl = 'http://localhost:8000';
   // const INTERVAL_SECONDS = 30000;
 
   const mapContainerRef = useRef(null);
